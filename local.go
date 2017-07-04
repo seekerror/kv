@@ -1,6 +1,7 @@
 package kv
 
 import (
+	"context"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -31,29 +32,34 @@ func makePath(s *localStore, key string) (string, error) {
 	return filepath.Join(s.root, filepath.FromSlash(key)), nil
 }
 
-func (s *localStore) List(key string) ([]string, error) {
+func (s *localStore) List(ctx context.Context, key string) ([]string, []string, error) {
 	dir, err := makePath(s, key)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	infos, err := ioutil.ReadDir(dir)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return nil, KeyNotFoundErr
+			return nil, nil, KeyNotFoundErr
 		}
-		return nil, err
+		return nil, nil, err
 	}
 
-	var ret []string
+	var dirs, blobs []string
 	for _, info := range infos {
-		ret = append(ret, info.Name())
+		if info.Mode().IsDir() {
+			dirs = append(dirs, info.Name())
+		} else {
+			blobs = append(blobs, info.Name())
+		}
 	}
-	sort.Strings(ret)
-	return ret, nil
+	sort.Strings(dirs)
+	sort.Strings(blobs)
+	return dirs, blobs, nil
 }
 
-func (s *localStore) Read(key string) ([]byte, error) {
+func (s *localStore) Read(ctx context.Context, key string) ([]byte, error) {
 	file, err := makePath(s, key)
 	if err != nil {
 		return nil, err
@@ -70,7 +76,7 @@ func (s *localStore) Read(key string) ([]byte, error) {
 	return data, nil
 }
 
-func (s *localStore) Write(key string, data []byte) error {
+func (s *localStore) Write(ctx context.Context, key string, data []byte) error {
 	file, err := makePath(s, key)
 	if err != nil {
 		return err
@@ -83,7 +89,7 @@ func (s *localStore) Write(key string, data []byte) error {
 	return ioutil.WriteFile(file, data, 0644)
 }
 
-func (s *localStore) Delete(key string) error {
+func (s *localStore) Delete(ctx context.Context, key string) error {
 	file, err := makePath(s, key)
 	if err != nil {
 		return err

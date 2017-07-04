@@ -23,7 +23,7 @@ type handler struct {
 func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	key := strings.Trim(r.URL.Path, "/")
 
-	data, err := h.r.Read(key)
+	data, err := h.r.Read(r.Context(), key)
 	if err != nil {
 		code := http.StatusInternalServerError
 		if err == KeyNotFoundErr {

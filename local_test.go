@@ -1,6 +1,7 @@
 package kv
 
 import (
+	"context"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -11,24 +12,26 @@ import (
 // TestList tests that list works correctly, incl on
 // empty stores and with direct filesystem updates.
 func TestLocalList(t *testing.T) {
+	ctx := context.Background()
 	s, root := makeEmptyStore(t)
-	assertList(t, s, "", nil)
+	assertList(ctx, t, s, "", nil, nil)
 
 	makeTempFile(t, filepath.Join(root, "foo.txt"))
-	assertList(t, s, "", []string{"foo.txt"})
+	assertList(ctx, t, s, "", nil, []string{"foo.txt"})
 
 	makeTempFile(t, filepath.Join(root, "bar/baz.txt"))
 	makeTempFile(t, filepath.Join(root, "bar/foo/baz.txt"))
-	assertList(t, s, "", []string{"bar", "foo.txt"})
-	assertList(t, s, "bar", []string{"baz.txt", "foo"})
+	assertList(ctx, t, s, "", []string{"bar"}, []string{"foo.txt"})
+	assertList(ctx, t, s, "bar", []string{"foo"}, []string{"baz.txt"})
 }
 
 // TestLocalRead tests that read works correctly.
 func TestLocalRead(t *testing.T) {
+	ctx := context.Background()
 	s, root := makeEmptyStore(t)
 	makeTempFile(t, filepath.Join(root, "bar/baz.txt"))
 
-	data, err := s.Read("bar/baz.txt")
+	data, err := s.Read(ctx, "bar/baz.txt")
 	if err != nil {
 		t.Errorf("Read(bar/baz.txt) failed: %v", err)
 	}
@@ -36,7 +39,7 @@ func TestLocalRead(t *testing.T) {
 		t.Errorf("Read(bar/baz.txt) returned '%s', want '%s'", string(data), "testdata")
 	}
 
-	_, err = s.Read("not_present")
+	_, err = s.Read(ctx, "not_present")
 	if err != KeyNotFoundErr {
 		t.Errorf("Read(not_present) returned %v, want %v", err, KeyNotFoundErr)
 	}
@@ -44,14 +47,15 @@ func TestLocalRead(t *testing.T) {
 
 // TestLocalWrite tests that write works correctly.
 func TestLocalWrite(t *testing.T) {
+	ctx := context.Background()
 	s, _ := makeEmptyStore(t)
 
 	data := []byte("hello")
-	if err := s.Write("bar/baz.txt", data); err != nil {
+	if err := s.Write(ctx, "bar/baz.txt", data); err != nil {
 		t.Errorf("Write(bar/baz.txt) failed: %v", err)
 	}
 
-	data, err := s.Read("bar/baz.txt")
+	data, err := s.Read(ctx, "bar/baz.txt")
 	if err != nil {
 		t.Errorf("Read(bar/baz.txt) failed: %v", err)
 	}
@@ -62,23 +66,24 @@ func TestLocalWrite(t *testing.T) {
 
 // TestLocalDelete tests that delete works correctly.
 func TestLocalDelete(t *testing.T) {
+	ctx := context.Background()
 	s, root := makeEmptyStore(t)
 	makeTempFile(t, filepath.Join(root, "bar/baz.txt"))
 
-	if err := s.Delete("bar/baz.txt"); err != nil {
+	if err := s.Delete(ctx, "bar/baz.txt"); err != nil {
 		t.Errorf("Delete(bar/baz.txt) failed: %v", err)
 	}
-	assertList(t, s, "bar", nil)
+	assertList(ctx, t, s, "bar", nil, nil)
 }
 
-func assertList(t *testing.T, s Store, key string, expected []string) {
-	actual, err := s.List(key)
+func assertList(ctx context.Context, t *testing.T, s Store, key string, expDirs, expBlobs []string) {
+	dirs, blobs, err := s.List(ctx, key)
 	if err != nil {
 		t.Fatalf("List failed: %v", err)
 	}
 
-	if !reflect.DeepEqual(actual, expected) {
-		t.Errorf("List(%s) = %v, want %v", key, actual, expected)
+	if !reflect.DeepEqual(dirs, expDirs) || !reflect.DeepEqual(blobs, expBlobs) {
+		t.Errorf("List(%s) = (%v,%v) want (%v,%v)", key, dirs, blobs, expDirs, expBlobs)
 	}
 }
 

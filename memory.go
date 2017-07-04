@@ -1,6 +1,7 @@
 package kv
 
 import (
+	"context"
 	"sort"
 	"strings"
 	"sync"
@@ -20,7 +21,7 @@ type memStore struct {
 	mu      sync.Mutex
 }
 
-func (s *memStore) List(key string) ([]string, error) {
+func (s *memStore) List(ctx context.Context, key string) ([]string, []string, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -31,7 +32,7 @@ func (s *memStore) List(key string) ([]string, error) {
 		key = strings.Trim(key, "/") + "/"
 	}
 
-	subkeys := make(map[string]bool)
+	subkeys := make(map[string]bool) // child -> isDir
 	for k, _ := range s.content {
 		if !strings.HasPrefix(k, key) {
 			continue
@@ -40,24 +41,31 @@ func (s *memStore) List(key string) ([]string, error) {
 		child := k[len(key):]
 		if index := strings.Index(child, "/"); index > -1 {
 			child = child[:index]
+			subkeys[child] = true
+		} else {
+			subkeys[child] = false
 		}
-		subkeys[child] = true
 	}
 
 	if len(subkeys) == 0 {
-		return nil, KeyNotFoundErr
+		return nil, nil, KeyNotFoundErr
 	}
 
-	var list []string
-	for k, _ := range subkeys {
-		list = append(list, k)
+	var dirs, blobs []string
+	for k, isDir := range subkeys {
+		if isDir {
+			dirs = append(dirs, k)
+		} else {
+			blobs = append(blobs, k)
+		}
 	}
 
-	sort.Strings(list)
-	return list, nil
+	sort.Strings(dirs)
+	sort.Strings(blobs)
+	return dirs, blobs, nil
 }
 
-func (s *memStore) Read(key string) ([]byte, error) {
+func (s *memStore) Read(ctx context.Context, key string) ([]byte, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -68,7 +76,7 @@ func (s *memStore) Read(key string) ([]byte, error) {
 	return ret, nil
 }
 
-func (s *memStore) Write(key string, data []byte) error {
+func (s *memStore) Write(ctx context.Context, key string, data []byte) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -76,7 +84,7 @@ func (s *memStore) Write(key string, data []byte) error {
 	return nil
 }
 
-func (s *memStore) Delete(key string) error {
+func (s *memStore) Delete(ctx context.Context, key string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 

@@ -2,7 +2,10 @@
 // storage backends.
 package kv
 
-import "errors"
+import (
+	"context"
+	"errors"
+)
 
 var (
 	KeyNotFoundErr = errors.New("Key not found")
@@ -16,12 +19,12 @@ var (
 type Reader interface {
 	// List returns the next level of keys and imposed directories. The list returned
 	// contains partial keys and the given key need to be path.Joined. If no subkeys
-	// exist, it may return either KeyNotFoundErr or an empty list.
-	List(key string) ([]string, error)
+	// exist, it may return either KeyNotFoundErr or empty lists.
+	List(ctx context.Context, key string) (dirs []string, blobs []string, err error)
 
 	// Read returns the value of the key, if present. If not present, it returns
 	// KeyNotFoundErr.
-	Read(key string) ([]byte, error)
+	Read(ctx context.Context, key string) ([]byte, error)
 }
 
 // Store is an interface for a simple key-value store with an imposed "/"-directory
@@ -30,7 +33,7 @@ type Reader interface {
 type Store interface {
 	Reader
 	// Write sets the value for the key.
-	Write(key string, value []byte) error
+	Write(ctx context.Context, key string, value []byte) error
 	// Delete deletes the key. It is not an error to delete a non-present key.
-	Delete(key string) error
+	Delete(ctx context.Context, key string) error
 }

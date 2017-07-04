@@ -1,10 +1,13 @@
 package kv
 
-import "encoding/json"
+import (
+	"context"
+	"encoding/json"
+)
 
 // ReadJSON returns the value decoded from json of the key.
-func ReadJSON(s Reader, key string, value interface{}) error {
-	data, err := s.Read(key)
+func ReadJSON(ctx context.Context, s Reader, key string, value interface{}) error {
+	data, err := s.Read(ctx, key)
 	if err != nil {
 		return err
 	}
@@ -12,10 +15,10 @@ func ReadJSON(s Reader, key string, value interface{}) error {
 }
 
 // WriteJSON sets the value encoded as json for the key.
-func WriteJSON(s Store, key string, value interface{}) error {
+func WriteJSON(ctx context.Context, s Store, key string, value interface{}) error {
 	data, err := json.Marshal(value)
 	if err != nil {
 		return err
 	}
-	return s.Write(key, data)
+	return s.Write(ctx, key, data)
 }
